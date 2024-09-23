@@ -1,15 +1,15 @@
 
 module pipe_side(stock_thickness=9.53, 
                  inner_width=20, 
-                 cut_up_height=500,
-                 upper_lip_cut_up_height = 50,
+                 pipe_length=500,
+                 upper_lip_pipe_length = 50,
                  foot_cavity_height=50, 
                  dado_width=3, 
                  dado_depth=4,
                  right=false) 
  {
     // TODO add screw holes?
-    total_height = cut_up_height+foot_cavity_height;
+    total_height = pipe_length+foot_cavity_height;
     difference() {
         translate([0, 0, 0])
             cube([inner_width+(2*dado_depth), 
@@ -20,22 +20,26 @@ module pipe_side(stock_thickness=9.53,
                   total_height, 
                   stock_thickness-dado_width]);
         translate([right?0:inner_width+dado_depth,
-                   foot_cavity_height+upper_lip_cut_up_height, 
+                   foot_cavity_height+upper_lip_pipe_length, 
                    dado_width])
             cube([dado_depth, 
-                  total_height-upper_lip_cut_up_height-foot_cavity_height, 
+                  total_height-upper_lip_pipe_length-foot_cavity_height, 
                   stock_thickness-dado_width]);
+        translate([dado_depth+(inner_width/2)-(dado_width/2),
+                   total_height-dado_depth,
+                   stock_thickness-dado_width])
+            #cube([dado_width, dado_depth, dado_width]);
     }
 }
 
 module pipe_back(stock_thickness=9.53, 
                  inner_width=20, 
-                 cut_up_height=500, 
+                 pipe_length=500, 
                  foot_cavity_height=50, 
                  dado_width=3, 
                  dado_depth=4) 
 {
-    total_height = cut_up_height+foot_cavity_height;
+    total_height = pipe_length+foot_cavity_height;
     difference() {
         translate([0, 0, 0])
             cube([inner_width+(2*stock_thickness), 
@@ -63,27 +67,27 @@ module pipe_back(stock_thickness=9.53,
 
 module pipe_front(stock_thickness=9.53, 
                  inner_width=20, 
-                 cut_up_height=500,
-                 upper_lip_cut_up_height = 50,
+                 pipe_length=500,
+                 upper_lip_pipe_length = 50,
                  foot_cavity_height=50, 
                  dado_width=3, 
                  dado_depth=4) 
 {
     difference() {
         cube([inner_width+(2*stock_thickness),
-              cut_up_height-upper_lip_cut_up_height, 
+              pipe_length-upper_lip_pipe_length, 
               stock_thickness]);
         translate([stock_thickness-dado_width, 
                    0, 
                    stock_thickness-dado_depth])
             cube([dado_width, 
-                  cut_up_height, 
+                  pipe_length, 
                   dado_depth]);
         translate([inner_width+stock_thickness, 
                    0, 
                    stock_thickness-dado_depth])
             cube([dado_width, 
-                  cut_up_height, 
+                  pipe_length, 
                   dado_depth]);
     }
 }
@@ -162,7 +166,7 @@ module wedge(inner_width=10,
 
 module upper_lip(stock_thickness=9.53,
                  inner_width=20,
-                 upper_lip_cut_up_height = 50,
+                 upper_lip_pipe_length = 50,
                  foot_cavity_height=50,
                  dado_depth=4,
                  air_band_thickness=1,
@@ -171,18 +175,18 @@ module upper_lip(stock_thickness=9.53,
 {
     difference() {
         cube([inner_width+2*stock_thickness,
-              foot_cavity_height+upper_lip_cut_up_height,
+              foot_cavity_height+upper_lip_pipe_length,
               stock_thickness]);
         translate([0, 0, stock_thickness-dado_depth])
             cube([stock_thickness,
                   foot_cavity_height+
-                    upper_lip_cut_up_height+
+                    upper_lip_pipe_length+
                     stock_thickness-dado_depth,
                   dado_depth]);
         translate([stock_thickness+inner_width, 0, stock_thickness-dado_depth])
             cube([stock_thickness,
                   foot_cavity_height+
-                    upper_lip_cut_up_height+
+                    upper_lip_pipe_length+
                     stock_thickness-dado_depth,
                   dado_depth]);
         translate([0, 0, stock_thickness-dado_depth])
@@ -232,10 +236,29 @@ module face(stock_thickness=9.53,
     }
 }
 
+module stopper(stock_thickness=9.53,
+               inner_width=20,
+               dado_width=3, 
+               dado_depth=4) 
+{
+
+    cube([inner_width+2*stock_thickness,
+          inner_width+2*stock_thickness,
+          stock_thickness-dado_depth]);
+    translate([0,
+               stock_thickness+(inner_width/2)-(dado_width/2), 
+               stock_thickness-dado_depth])
+        cube([dado_width, dado_width, dado_depth]);
+    translate([inner_width+2*stock_thickness-dado_width,
+               stock_thickness+(inner_width/2)-(dado_width/2),
+               stock_thickness-dado_depth])
+        cube([dado_width, dado_width, dado_depth]);
+}
+
 module exploded_view(stock_thickness=9.53, 
                      inner_width=20, 
-                     cut_up_height=500, 
-                     upper_lip_cut_up_height = 50,
+                     pipe_length=500, 
+                     upper_lip_pipe_length = 50,
                      foot_cavity_height=50, 
                      dado_width=3, 
                      dado_depth=4,
@@ -248,7 +271,7 @@ module exploded_view(stock_thickness=9.53,
         // pipe back
         pipe_back(stock_thickness=stock_thickness,
                   inner_width=inner_width, 
-                  cut_up_height=cut_up_height, 
+                  pipe_length=pipe_length, 
                   foot_cavity_height=foot_cavity_height, 
                   dado_width=dado_width, 
                   dado_depth=dado_depth);
@@ -260,8 +283,8 @@ module exploded_view(stock_thickness=9.53,
             rotate([0, 90, 0])
                 pipe_side(stock_thickness=stock_thickness,
                           inner_width=inner_width, 
-                          cut_up_height=cut_up_height, 
-                          upper_lip_cut_up_height=upper_lip_cut_up_height,
+                          pipe_length=pipe_length, 
+                          upper_lip_pipe_length=upper_lip_pipe_length,
                           foot_cavity_height=foot_cavity_height, 
                           dado_width=dado_width, 
                           dado_depth=dado_depth,
@@ -274,22 +297,22 @@ module exploded_view(stock_thickness=9.53,
             rotate([0, -90, 0])
                 pipe_side(stock_thickness=stock_thickness,
                           inner_width=inner_width, 
-                          cut_up_height=cut_up_height, 
-                          upper_lip_cut_up_height=upper_lip_cut_up_height,
+                          pipe_length=pipe_length, 
+                          upper_lip_pipe_length=upper_lip_pipe_length,
                           foot_cavity_height=foot_cavity_height, 
                           dado_width=dado_width, 
                           dado_depth=dado_depth);
             
         // pipe front
         translate([inner_width+2*stock_thickness, 
-                   foot_cavity_height+upper_lip_cut_up_height,
+                   foot_cavity_height+upper_lip_pipe_length,
                    2*stock_thickness
                      + inner_width+2*explode_by])
             rotate([0, 180, 0])
                 pipe_front(stock_thickness=stock_thickness,
                            inner_width=inner_width, 
-                           cut_up_height=cut_up_height,
-                           upper_lip_cut_up_height=upper_lip_cut_up_height,
+                           pipe_length=pipe_length,
+                           upper_lip_pipe_length=upper_lip_pipe_length,
                            foot_cavity_height=foot_cavity_height, 
                            dado_width=dado_width, 
                            dado_depth=dado_depth);
@@ -319,13 +342,13 @@ module exploded_view(stock_thickness=9.53,
             rotate([0,180,0])
                 upper_lip(stock_thickness=stock_thickness,
                           inner_width=inner_width,
-                          upper_lip_cut_up_height = upper_lip_cut_up_height,
+                          upper_lip_pipe_length = upper_lip_pipe_length,
                           foot_cavity_height=foot_cavity_height,
                           dado_depth=dado_depth,
                           air_band_thickness=air_band_thickness,
                           aperature=aperature,
                           lip_grade=lip_grade);
-                          
+        // face                 
         translate([inner_width+2*stock_thickness,
                    0,
                    3*stock_thickness+inner_width+4*explode_by])
@@ -335,4 +358,17 @@ module exploded_view(stock_thickness=9.53,
                      foot_cavity_height=50,
                      air_band_thickness=1,
                      aperature=4);
+        // stopper
+        translate([0,
+                   foot_cavity_height+
+                     pipe_length+
+                     stock_thickness-dado_depth + 
+                     explode_by,
+                   explode_by])
+            rotate([90, 0, 0])
+                stopper(stock_thickness=stock_thickness,
+                        inner_width=inner_width,
+                        dado_width=dado_width, 
+                        dado_depth=dado_depth);        
+                     
 }
