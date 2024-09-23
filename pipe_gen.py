@@ -78,5 +78,6 @@ def generate(midi_note, halving_number, blow_pressure, ising_number):
     print(f'Cut-up Height (H):           {H*1000:.3f} [mm] ({m_to_in(H):.3f} in)')
     print(f'Required CFM:                {compute_required_cfm(D, W, blow_pressure):.3f}')
 
+
 if __name__ == '__main__':
     generate()
