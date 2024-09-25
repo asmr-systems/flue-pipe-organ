@@ -277,7 +277,7 @@ module exploded_view(stock_thickness=9.53,
                   dado_depth=dado_depth);
 
         // pipe side
-        translate([stock_thickness+inner_width, 
+        translate([stock_thickness+inner_width + explode_by, 
                    0, 
                    inner_width+2*dado_depth + stock_thickness-dado_depth +               explode_by])
             rotate([0, 90, 0])
@@ -291,7 +291,7 @@ module exploded_view(stock_thickness=9.53,
                           right=true);
 
         // pipe side
-        translate([stock_thickness, 
+        translate([stock_thickness - explode_by, 
                    0, 
                    stock_thickness-dado_depth + explode_by])
             rotate([0, -90, 0])
