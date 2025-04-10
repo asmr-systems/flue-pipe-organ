@@ -1,6 +1,8 @@
+import os
 import math
 import click
 import numpy as np
+from jinja2 import Environment, FileSystemLoader
 
 SPEED_OF_SOUND = 343.32 # m/s @ room temp
 m_to_in = lambda x : x * 39.3701 # meters to inches
@@ -27,7 +29,7 @@ def compute_flue_air_band_thickness(inner_width):
     return inner_width / 100
 
 def compute_cut_up_height(freq, flue_air_band_thickness, blow_pressure, ising_number = 2):
-    """calculate required cut up height given frequency (F) [hz],
+    """calculate required cut up height (aperature) given frequency (F) [hz],
     flue air band thickness (D) [meters], blow pressure (P) [Pa], and
     optionally Ising number (defaults to 2).
 
@@ -51,12 +53,40 @@ def compute_required_cfm(flue_air_band_thickness, flue_width, pressure):
     air_density_factor = 27.86
     return air_density_factor * flow_area * math.sqrt(psi_to_in_h20(pa_to_psi(pressure)))
 
+
+# create separate step files or one with multiple parts
+# we need to also take the stock width and height into account
+# TODO
+def generate_scad(pipe_length,             # [mm]
+                  inner_width,             # [mm]
+                  air_band_thickness,      # [mm]
+                  cutup_height,            # [mm]
+                  stock_thickness=9.53,    # [mm]
+                  foot_cavity_height=76.2, # [mm]
+                  dado_depth_percent=0.25, # [%]
+                  lip_grade=45,            # [degrees]
+                  foot_hole_dia=10):       # [mm]
+    # NOTE: making dado depth and width equal here. but
+    # we don't have to do that if we don't want to.
+    return f"""use <pipe_parts.scad>
+
+pipe_back(stock_thickness={stock_thickness},
+    inner_width={inner_width},
+    pipe_length={pipe_length},
+    foot_cavity_height={foot_cavity_height},
+    dado_width={dado_depth_percent*stock_thickness},
+    dado_depth={dado_depth_percent*stock_thickness});
+"""
+
 @click.command()
+@click.option('-o','--output-filename', help='output filename (no extension)')
 @click.option('-n','--midi-note', default=69, help='midi note number of pipe')
 @click.option('-m','--halving-number', default=16, help='halving number of pipe ranks')
 @click.option('-p','--blow-pressure', default=689.476, help='available blow pressure [Pa]')
 @click.option('-i','--ising-number', default=2, help='Ising number for blow efficiency')
-def generate(midi_note, halving_number, blow_pressure, ising_number):
+@click.option('-c','--foot-cavity-height', default=76.2, help='height of foot cavity [mm]')
+@click.option('-d','--dado-depth-percent', default=0.25, help='dado depth as percentage of stock thickness (<0.5) [%]')
+def generate(output_filename, midi_note, halving_number, blow_pressure, ising_number, foot_cavity_height, dado_depth_percent):
     """generates flue pipe dimensions according to provided specs."""
     # note: for default blow pressure, see https://en.wikipedia.org/wiki/Pipe_organ#:~:text=Pipe%20organ%20wind%20pressures%20are,two%20legs%20of%20the%20manometer.
 
@@ -78,6 +108,28 @@ def generate(midi_note, halving_number, blow_pressure, ising_number):
     print(f'Cut-up Height (H):           {H*1000:.3f} [mm] ({m_to_in(H):.3f} in)')
     print(f'Required CFM:                {compute_required_cfm(D, W, blow_pressure):.3f}')
 
+    fn = f'cad/scad/generated/{output_filename}'
+    environment = Environment(loader=FileSystemLoader("cad/templates/"))
+    template = environment.get_template("parts.scad.jinja2")
+    with open(f'{fn}.scad', 'w') as scad_file:
+        o = template.render(
+            pipe_length=L*1000,                    # [mm]
+            inner_width=W*1000,                    # [mm]
+            air_band_thickness=D*1000,             # [mm]
+            cut_up_height=H*1000,                  # [mm]
+            stock_thickness=9.53,                  # [mm]
+            foot_cavity_height=foot_cavity_height, # [mm]
+            dado_depth_percent=dado_depth_percent, # [%]
+            parts_margin=25.4,                     # [mm]
+            upper_lip_pipe_length=50 # TODO IDK what this is...
+        )
+        scad_file.write(o)
+
+    # output stl using scad commandline tool
+    os.system(f'openscad -o {fn}.stl {fn}.scad')
+
+    # convert stl to setp file using freecad commandline
+    os.system(f'freecadcmd stl_to_step.py {fn}.stl')
 
 if __name__ == '__main__':
     generate()

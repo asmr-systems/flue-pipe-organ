@@ -19,6 +19,10 @@ pip install -r requirements.txt
 
 # view all input parameters
 python pipe_gen.py --help
+
+# open a new scad file and write
+use <pip_parts.scad>
+exploded_view();
 ```
 
 ## Future Ideas

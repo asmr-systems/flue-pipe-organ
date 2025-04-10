@@ -1,0 +1,21 @@
+use <../pipe_parts.scad>
+
+{% set dado_mm = dado_depth_percent*stock_thickness %}
+pipe_back(stock_thickness={{stock_thickness}},
+          inner_width={{inner_width}},
+          pipe_length={{pipe_length}},
+          foot_cavity_height={{foot_cavity_height}},
+          dado_width={{dado_mm}},
+          dado_depth={{dado_mm}});
+
+// pipe side
+{% set pipe_left_side_x = dado_mm*2 + inner_width + parts_margin %}
+translate([{{pipe_left_side_x}}, 0, 0])
+pipe_side(stock_thickness={{stock_thickness}},
+          inner_width={{inner_width}}, 
+          pipe_length={{pipe_length}}, 
+          upper_lip_pipe_length={{upper_lip_pipe_length}},
+          foot_cavity_height={{foot_cavity_height}}, 
+          dado_width={{dado_mm}}, 
+          dado_depth={{dado_mm}},
+          right=true);
