@@ -8,13 +8,13 @@ class Defaults:
     stock_thickness: float = 9.53
     inner_width: float = 20
     pipe_length: float = 500
-    upper_lip_pipe_length: float = 70
+    upper_lip_pipe_length: float = 50
     foot_cavity_height: float = 40
     dado_width: float = 3
     dado_depth: float = 4
     foot_hole_dia: float = 10
     air_band_thickness: float = 1
-    aperature: float = 10
+    aperature: float = 4
     lip_grade_degrees: float = 20
 
 def pipe_back(
@@ -270,6 +270,37 @@ def pipe_upper_lip(
         show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
+def pipe_face(
+        stock_thickness=Defaults.stock_thickness,
+        inner_width=Defaults.inner_width,
+        foot_cavity_height=Defaults.foot_cavity_height,
+        air_band_thickness=Defaults.air_band_thickness,
+        aperature=Defaults.aperature,
+        show=False
+):
+    part = (
+        # stock
+        cq.Workplane("XY")
+        .rect(
+            inner_width+2*stock_thickness,
+            foot_cavity_height,
+        )
+        .extrude(stock_thickness)
+        # channel
+        .faces(">Z")
+        .workplane(origin=(
+            0,
+            foot_cavity_height/2 - (aperature+stock_thickness)/2,
+            0
+        ))
+        .rect(inner_width, aperature+stock_thickness)
+        .cutBlind(-air_band_thickness)
+    )
+    if show:
+        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
+    return part
+
+
 def generate(
         stock_thickness=Defaults.stock_thickness,
         inner_width=Defaults.inner_width,
@@ -346,6 +377,13 @@ def generate(
         aperature=aperature,
         lip_grade_degrees=lip_grade_degrees
     )
+    face = pipe_face(
+        stock_thickness=stock_thickness,
+        inner_width=inner_width,
+        foot_cavity_height=foot_cavity_height,
+        air_band_thickness=air_band_thickness,
+        aperature=aperature
+    )
 
     if show_assembly:
         assembly = cq.Assembly()
@@ -419,8 +457,19 @@ def generate(
                 180, 0, 180
             )
         )
+        assembly.add(
+            face,
+            name="face",
+            color=cq.Color(0.04, 0.34, 0.7, 0.3),
+            loc=cq.Location(
+                0,
+                -(pipe_length)/2,
+                stock_thickness*3 + inner_width + exploded_by*2,
+                180, 0, 180
+            )
+        )
 
         show_object(assembly)
 
 generate(show_assembly=True, exploded_by=0)
-# pipe_upper_lip(show=True)
+# pipe_face(show=True)
