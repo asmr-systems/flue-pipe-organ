@@ -16,6 +16,8 @@ class Defaults:
     air_band_thickness: float = 1
     aperature: float = 4
     lip_grade_degrees: float = 20
+    stopper_dowel_dia: float = 13
+    stopper_felt_tolerance: float = 1
 
 def pipe_back(
         stock_thickness=Defaults.stock_thickness,
@@ -300,6 +302,31 @@ def pipe_face(
         show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
+def pipe_stopper(
+        stock_thickness=Defaults.stock_thickness,
+        inner_width=Defaults.inner_width,
+        stopper_dowel_dia=Defaults.stopper_dowel_dia,
+        stopper_felt_tolerance=Defaults.stopper_felt_tolerance,
+        show=False
+):
+    part = (
+        # stock
+        cq.Workplane("XY")
+        .rect(
+            inner_width-stopper_felt_tolerance,
+            inner_width-stopper_felt_tolerance,
+        )
+        .extrude(stock_thickness)
+        # dowel hole
+        .faces(">Z")
+        .workplane()
+        .circle(stopper_dowel_dia/2)
+        .cutBlind(-stock_thickness*0.75)
+    )
+    if show:
+        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
+    return part
+
 
 def generate(
         stock_thickness=Defaults.stock_thickness,
@@ -313,6 +340,8 @@ def generate(
         air_band_thickness=Defaults.air_band_thickness,
         aperature=Defaults.aperature,
         lip_grade_degrees=Defaults.lip_grade_degrees,
+        stopper_dowel_dia=Defaults.stopper_dowel_dia,
+        stopper_felt_tolerance=Defaults.stopper_felt_tolerance,
         show_assembly=False,
         save=False,
         exploded_by=10.0,
@@ -383,6 +412,12 @@ def generate(
         foot_cavity_height=foot_cavity_height,
         air_band_thickness=air_band_thickness,
         aperature=aperature
+    )
+    stopper = pipe_stopper(
+        stock_thickness=stock_thickness,
+        inner_width=inner_width,
+        stopper_dowel_dia=stopper_dowel_dia,
+        stopper_felt_tolerance=stopper_felt_tolerance,
     )
 
     if show_assembly:
@@ -468,8 +503,19 @@ def generate(
                 180, 0, 180
             )
         )
+        assembly.add(
+            stopper,
+            name="stopper",
+            color=cq.Color(0.04, 0.34, 0.7, 0.3),
+            loc=cq.Location(
+                0,
+                (pipe_length)/2,
+                stock_thickness + inner_width/2 + exploded_by*2,
+                -90, 0, 0
+            )
+        )
 
         show_object(assembly)
 
 generate(show_assembly=True, exploded_by=0)
-# pipe_face(show=True)
+# pipe_stopper(show=True)
