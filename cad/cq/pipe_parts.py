@@ -1,3 +1,4 @@
+import math
 import cadquery as cq
 from dataclasses import dataclass
 
@@ -7,11 +8,14 @@ class Defaults:
     stock_thickness: float = 9.53
     inner_width: float = 20
     pipe_length: float = 500
-    upper_lip_pipe_length: float = 50
-    foot_cavity_height: float = 50
+    upper_lip_pipe_length: float = 70
+    foot_cavity_height: float = 40
     dado_width: float = 3
     dado_depth: float = 4
     foot_hole_dia: float = 10
+    air_band_thickness: float = 1
+    aperature: float = 10
+    lip_grade_degrees: float = 20
 
 def pipe_back(
         stock_thickness=Defaults.stock_thickness,
@@ -43,7 +47,11 @@ def pipe_back(
         .cutBlind(-dado_depth)
         # foot cavity dado groove
         .faces(">Z")
-        .workplane(origin=(0, -total_height/2 + foot_cavity_height + dado_width/2, 0))
+        .workplane(origin=(
+            0,
+            -total_height/2 + foot_cavity_height - dado_width/2,
+            0
+        ))
         .rect(inner_width, dado_width)
         .cutBlind(-dado_depth)
     )
@@ -141,7 +149,7 @@ def pipe_languid(
     part = (
         # stock
         cq.Workplane("XY")
-        .rect(inner_width, inner_width)
+        .rect(inner_width, inner_width+dado_depth)
         .extrude(stock_thickness)
         # dado
         .faces("<Y")
@@ -183,6 +191,85 @@ def pipe_foot_base(
         show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
+def pipe_upper_lip(
+        stock_thickness=Defaults.stock_thickness,
+        inner_width=Defaults.inner_width,
+        upper_lip_pipe_length=Defaults.upper_lip_pipe_length,
+        foot_cavity_height=Defaults.foot_cavity_height,
+        dado_depth=Defaults.dado_depth,
+        aperature=Defaults.aperature,
+        lip_grade_degrees=Defaults.lip_grade_degrees,
+        show=False
+):
+    part = (
+        # stock
+        cq.Workplane("XY")
+        .rect(
+            inner_width+2*stock_thickness,
+            foot_cavity_height+upper_lip_pipe_length,
+        )
+        .extrude(stock_thickness-dado_depth)
+        # cut out channel opening
+        .faces(">Z")
+        .workplane(origin=(
+            0,
+            -(aperature/2 + (upper_lip_pipe_length-foot_cavity_height)/2 + stock_thickness),
+            0
+        ))
+        .rect(inner_width, aperature)
+        .cutThruAll()
+        # aperature
+        .faces(">Z")
+        .workplane(origin=(
+            0,
+            -(-aperature/2 + (upper_lip_pipe_length-foot_cavity_height)/2),
+            0
+        ))
+        .rect(inner_width, aperature)
+        .cutThruAll()
+        # inset for languid
+        .faces(">Z")
+        .tag("upper_lip_face")
+        .workplane(origin=(
+            0,
+            -(upper_lip_pipe_length+foot_cavity_height)/2 + (foot_cavity_height-aperature-stock_thickness)/2,
+            0
+        ))
+        .rect(inner_width, foot_cavity_height-aperature-stock_thickness)
+        .extrude(dado_depth)
+        # upper lip wedge
+        .faces(tag="upper_lip_face")
+        .workplane(origin=(
+            0,
+            (upper_lip_pipe_length - aperature)/2 - (upper_lip_pipe_length-foot_cavity_height)/2 + aperature,
+            0
+        ))
+        .rect(inner_width, upper_lip_pipe_length - aperature)
+        .extrude(dado_depth)
+        # wedge
+    )
+
+    wedge_length = stock_thickness/math.tan(lip_grade_degrees*math.pi/180)
+    pts = [(0,0), (stock_thickness, 0), (stock_thickness, wedge_length)]
+    wedge_part = (
+       cq.Workplane(
+           "ZY",
+           origin=(
+               inner_width/2,
+            -(-aperature/2 + (upper_lip_pipe_length-foot_cavity_height)/2) + aperature/2,
+               0)
+       )
+        .polyline(pts)
+        .close()
+        .extrude(inner_width)
+    )
+
+    part = part.cut(wedge_part)
+
+    if show:
+        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
+    return part
+
 def generate(
         stock_thickness=Defaults.stock_thickness,
         inner_width=Defaults.inner_width,
@@ -192,6 +279,9 @@ def generate(
         dado_width=Defaults.dado_width,
         dado_depth=Defaults.dado_depth,
         foot_hole_dia=Defaults.foot_hole_dia,
+        air_band_thickness=Defaults.air_band_thickness,
+        aperature=Defaults.aperature,
+        lip_grade_degrees=Defaults.lip_grade_degrees,
         show_assembly=False,
         save=False,
         exploded_by=10.0,
@@ -247,6 +337,15 @@ def generate(
         dado_depth=dado_depth,
         foot_hole_dia=foot_hole_dia
     )
+    upper_lip = pipe_upper_lip(
+        stock_thickness=stock_thickness,
+        inner_width=inner_width,
+        upper_lip_pipe_length=upper_lip_pipe_length,
+        foot_cavity_height=foot_cavity_height,
+        dado_depth=dado_depth,
+        aperature=aperature,
+        lip_grade_degrees=lip_grade_degrees
+    )
 
     if show_assembly:
         assembly = cq.Assembly()
@@ -282,7 +381,7 @@ def generate(
             color=cq.Color(0.44, 0.94, 0.4, 0.3),
             loc=cq.Location(
                 0,
-                upper_lip_pipe_length,
+                 (foot_cavity_height+upper_lip_pipe_length)/2,
                 stock_thickness*2 + inner_width + exploded_by*2,
                 0, 180, 0
             )
@@ -293,8 +392,8 @@ def generate(
             color=cq.Color(0.44, 0.94, 0.9, 0.3),
             loc=cq.Location(
                 0,
-                -pipe_length/2 + foot_cavity_height/2 + dado_width,
-                (inner_width/2 - stock_thickness) + stock_thickness*2 + exploded_by*2,
+                -pipe_length/2 + foot_cavity_height/2,
+                ((inner_width+dado_depth)/2 - stock_thickness) + stock_thickness*2 + exploded_by*2,
                 90, 0, 0
             )
         )
@@ -309,7 +408,19 @@ def generate(
                 -90, 0, 0
             )
         )
+        assembly.add(
+            upper_lip,
+            name="upper_lip",
+            color=cq.Color(0.94, 0.94, 0.1, 0.3),
+            loc=cq.Location(
+                0,
+                -(pipe_length + foot_cavity_height)/2 + (foot_cavity_height+upper_lip_pipe_length)/2,
+                stock_thickness*2 + inner_width + exploded_by*2,
+                180, 0, 180
+            )
+        )
+
         show_object(assembly)
 
 generate(show_assembly=True, exploded_by=0)
-# pipe_foot_base(show=True)
+# pipe_upper_lip(show=True)
