@@ -11,6 +11,7 @@ class Defaults:
     foot_cavity_height: float = 50
     dado_width: float = 3
     dado_depth: float = 4
+    foot_hole_dia: float = 10
 
 def pipe_back(
         stock_thickness=Defaults.stock_thickness,
@@ -152,6 +153,36 @@ def pipe_languid(
         show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
+def pipe_foot_base(
+        stock_thickness=Defaults.stock_thickness,
+        inner_width=Defaults.inner_width,
+        dado_depth=Defaults.dado_depth,
+        foot_hole_dia=Defaults.foot_hole_dia,
+        show=False
+):
+    part = (
+        # stock
+        cq.Workplane("XY")
+        .rect(
+            inner_width+2*stock_thickness,
+            inner_width+2*stock_thickness,
+        )
+        .extrude(stock_thickness-dado_depth)
+        # non-dado face
+        .faces(">Z")
+        .workplane()
+        .rect(inner_width, inner_width)
+        .extrude(dado_depth)
+        # foot base hole
+        .faces(">Z")
+        .workplane()
+        .circle(foot_hole_dia/2)
+        .cutThruAll()
+    )
+    if show:
+        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
+    return part
+
 def generate(
         stock_thickness=Defaults.stock_thickness,
         inner_width=Defaults.inner_width,
@@ -160,6 +191,7 @@ def generate(
         foot_cavity_height=Defaults.foot_cavity_height,
         dado_width=Defaults.dado_width,
         dado_depth=Defaults.dado_depth,
+        foot_hole_dia=Defaults.foot_hole_dia,
         show_assembly=False,
         save=False,
         exploded_by=10.0,
@@ -208,6 +240,12 @@ def generate(
         inner_width=inner_width,
         dado_width=dado_width,
         dado_depth=dado_depth
+    )
+    foot_base = pipe_foot_base(
+        stock_thickness=stock_thickness,
+        inner_width=inner_width,
+        dado_depth=dado_depth,
+        foot_hole_dia=foot_hole_dia
     )
 
     if show_assembly:
@@ -260,7 +298,18 @@ def generate(
                 90, 0, 0
             )
         )
+        assembly.add(
+            foot_base,
+            name="foot_base",
+            color=cq.Color(0.74, 0.44, 0.1, 0.3),
+            loc=cq.Location(
+                0,
+                -pipe_length/2 - foot_cavity_height/2 - (stock_thickness-dado_depth),
+                (inner_width/2 - stock_thickness) + stock_thickness*2 + exploded_by*2,
+                -90, 0, 0
+            )
+        )
         show_object(assembly)
 
-generate(show_assembly=True, exploded_by=20)
-# pipe_languid(show=True)
+generate(show_assembly=True, exploded_by=0)
+# pipe_foot_base(show=True)
