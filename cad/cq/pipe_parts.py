@@ -130,6 +130,28 @@ def pipe_front(
         show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
+def pipe_languid(
+        stock_thickness=Defaults.stock_thickness,
+        inner_width=Defaults.inner_width,
+        dado_width=Defaults.dado_width,
+        dado_depth=Defaults.dado_depth,
+        show=False
+):
+    part = (
+        # stock
+        cq.Workplane("XY")
+        .rect(inner_width, inner_width)
+        .extrude(stock_thickness)
+        # dado
+        .faces("<Y")
+        .workplane(origin=(0,0,dado_width/2))
+        .rect(inner_width, dado_width)
+        .extrude(dado_depth)
+    )
+    if show:
+        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
+    return part
+
 def generate(
         stock_thickness=Defaults.stock_thickness,
         inner_width=Defaults.inner_width,
@@ -181,6 +203,12 @@ def generate(
         dado_width=dado_width,
         dado_depth=dado_depth
     )
+    languid = pipe_languid(
+        stock_thickness=stock_thickness,
+        inner_width=inner_width,
+        dado_width=dado_width,
+        dado_depth=dado_depth
+    )
 
     if show_assembly:
         assembly = cq.Assembly()
@@ -212,7 +240,7 @@ def generate(
         )
         assembly.add(
             front,
-            name="=front",
+            name="front",
             color=cq.Color(0.44, 0.94, 0.4, 0.3),
             loc=cq.Location(
                 0,
@@ -221,7 +249,18 @@ def generate(
                 0, 180, 0
             )
         )
+        assembly.add(
+            languid,
+            name="languid",
+            color=cq.Color(0.44, 0.94, 0.9, 0.3),
+            loc=cq.Location(
+                0,
+                -pipe_length/2 + foot_cavity_height/2 + dado_width,
+                (inner_width/2 - stock_thickness) + stock_thickness*2 + exploded_by*2,
+                90, 0, 0
+            )
+        )
         show_object(assembly)
 
-generate(show_assembly=True, exploded_by=0)
-# pipe_front(show=True)
+generate(show_assembly=True, exploded_by=20)
+# pipe_languid(show=True)
