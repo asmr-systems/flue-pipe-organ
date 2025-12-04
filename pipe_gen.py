@@ -1,8 +1,12 @@
+#!/bin/env python
+
 import os
 import math
 import click
 import numpy as np
-from jinja2 import Environment, FileSystemLoader
+import pipe_parts
+from pipe_parts import Dimensions
+
 
 SPEED_OF_SOUND = 343.32 # m/s @ room temp
 m_to_in = lambda x : x * 39.3701 # meters to inches
@@ -54,39 +58,43 @@ def compute_required_cfm(flue_air_band_thickness, flue_width, pressure):
     return air_density_factor * flow_area * math.sqrt(psi_to_in_h20(pa_to_psi(pressure)))
 
 
-# create separate step files or one with multiple parts
-# we need to also take the stock width and height into account
-# TODO
-def generate_scad(pipe_length,             # [mm]
-                  inner_width,             # [mm]
-                  air_band_thickness,      # [mm]
-                  cutup_height,            # [mm]
-                  stock_thickness=9.53,    # [mm]
-                  foot_cavity_height=76.2, # [mm]
-                  dado_depth_percent=0.25, # [%]
-                  lip_grade=45,            # [degrees]
-                  foot_hole_dia=10):       # [mm]
-    # NOTE: making dado depth and width equal here. but
-    # we don't have to do that if we don't want to.
-    return f"""use <pipe_parts.scad>
-
-pipe_back(stock_thickness={stock_thickness},
-    inner_width={inner_width},
-    pipe_length={pipe_length},
-    foot_cavity_height={foot_cavity_height},
-    dado_width={dado_depth_percent*stock_thickness},
-    dado_depth={dado_depth_percent*stock_thickness});
-"""
-
 @click.command()
-@click.option('-o','--output-filename', help='output filename (no extension)')
+@click.option('-o','--output-dir', default="cad/step", help='output directory')
 @click.option('-n','--midi-note', default=69, help='midi note number of pipe')
 @click.option('-m','--halving-number', default=16, help='halving number of pipe ranks')
 @click.option('-p','--blow-pressure', default=689.476, help='available blow pressure [Pa]')
 @click.option('-i','--ising-number', default=2, help='Ising number for blow efficiency')
 @click.option('-c','--foot-cavity-height', default=76.2, help='height of foot cavity [mm]')
-@click.option('-d','--dado-depth-percent', default=0.25, help='dado depth as percentage of stock thickness (<0.5) [%]')
-def generate(output_filename, midi_note, halving_number, blow_pressure, ising_number, foot_cavity_height, dado_depth_percent):
+@click.option('-d','--dado-depth', default=Dimensions.dado_depth, help='dado depth of pipe part thickness [mm]')
+@click.option('-w','--dado-width', default=Dimensions.dado_width, help='dado width of pipe part thickness [mm]')
+@click.option('-u','--upper-lip-height', default=Dimensions.upper_lip_height, help='height of upper lip peice [mm]')
+@click.option('-T','--stock-thickness', default=Dimensions.stock_thickness, help='thickness of stock material [mm]')
+@click.option('-W','--stock-width', default=Dimensions.stock_width, help='width of stock material [mm]')
+@click.option('-H','--stock-height', default=Dimensions.stock_height, help='height of stock material [mm]')
+@click.option('-P','--pipe-part-thickness', default=Dimensions.pipe_part_thickness, help='thickness of pipe parts (<= stock_thickness) [mm]')
+@click.option('-F','--foot-hole-diameter', default=Dimensions.foot_hole_dia, help='foot hole diameter [mm]')
+@click.option('-D','--lip-grade', default=Dimensions.lip_grade_degrees, help='angle grade of lip slope [degrees]')
+@click.option('-O','--stopper-dowel-diameter', default=Dimensions.stopper_dowel_dia, help='diameter of stopper dowel [mm]')
+@click.option('-e','--stopper-felt-tolerance', default=Dimensions.stopper_felt_tolerance, help='tolerance of felt on stopper [mm]')
+def generate(
+        output_dir,
+        midi_note,
+        halving_number,
+        blow_pressure,
+        ising_number,
+        foot_cavity_height,
+        dado_depth,
+        dado_width,
+        upper_lip_height,
+        stock_thickness,
+        stock_width,
+        stock_height,
+        pipe_part_thickness,
+        foot_hole_diameter,
+        lip_grade,
+        stopper_dowel_diameter,
+        stopper_felt_tolerance
+):
     """generates flue pipe dimensions according to provided specs."""
     # note: for default blow pressure, see https://en.wikipedia.org/wiki/Pipe_organ#:~:text=Pipe%20organ%20wind%20pressures%20are,two%20legs%20of%20the%20manometer.
 
@@ -108,28 +116,29 @@ def generate(output_filename, midi_note, halving_number, blow_pressure, ising_nu
     print(f'Cut-up Height (H):           {H*1000:.3f} [mm] ({m_to_in(H):.3f} in)')
     print(f'Required CFM:                {compute_required_cfm(D, W, blow_pressure):.3f}')
 
-    fn = f'cad/scad/generated/{output_filename}'
-    environment = Environment(loader=FileSystemLoader("cad/templates/"))
-    template = environment.get_template("parts.scad.jinja2")
-    with open(f'{fn}.scad', 'w') as scad_file:
-        o = template.render(
-            pipe_length=L*1000,                    # [mm]
-            inner_width=W*1000,                    # [mm]
-            air_band_thickness=D*1000,             # [mm]
-            cut_up_height=H*1000,                  # [mm]
-            stock_thickness=9.53,                  # [mm]
-            foot_cavity_height=foot_cavity_height, # [mm]
-            dado_depth_percent=dado_depth_percent, # [%]
-            parts_margin=25.4,                     # [mm]
-            upper_lip_pipe_length=50 # TODO IDK what this is...
-        )
-        scad_file.write(o)
+    dimensions = pipe_parts.Dimensions()
+    dimensions.stock_thickness = stock_thickness
+    dimensions.stock_width = stock_width
+    dimensions.stock_height = stock_height
+    dimensions.pipe_part_thickness = pipe_part_thickness
+    dimensions.upper_lip_height = upper_lip_height
+    dimensions.inner_width = W*1000
+    dimensions.pipe_length = L*1000
+    dimensions.foot_cavity_height = foot_cavity_height
+    dimensions.dado_width = dado_width
+    dimensions.dado_depth = dado_depth
+    dimensions.foot_hole_dia = foot_hole_diameter
+    dimensions.air_band_thickness = D*1000
+    dimensions.aperature = H*1000
+    dimensions.lip_grade_degrees = lip_grade
+    dimensions.stopper_dowel_dia = stopper_dowel_diameter
+    dimensions.stopper_felt_tolerance = stopper_felt_tolerance
 
-    # output stl using scad commandline tool
-    os.system(f'openscad -o {fn}.stl {fn}.scad')
-
-    # convert stl to setp file using freecad commandline
-    os.system(f'freecadcmd stl_to_step.py {fn}.stl')
+    pipe_parts.generate(
+        dimensions,
+        save=True,
+        step_dir=output_dir
+    )
 
 if __name__ == '__main__':
     generate()

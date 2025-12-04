@@ -1,3 +1,4 @@
+# (coco|2025.12.04) i think we should try this
 # (coco|2025.10.15) this experiment uses the ocp_freecad_cam python
 # library to generate toolpaths which can be imported into freecad.
 # the following code demonstrates doing a simple toolpath operation.
