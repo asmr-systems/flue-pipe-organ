@@ -1,6 +1,8 @@
 import math
 import cadquery as cq
 from dataclasses import dataclass
+from ocp_freecad_cam import Endmill, Job
+from ocp_freecad_cam.api import Stock
 
 @dataclass
 class Dimensions:
@@ -22,7 +24,74 @@ class Dimensions:
     stopper_dowel_dia: float = 13
     stopper_felt_tolerance: float = 1
 
-def pipe_back(D, show=False):
+class Part:
+    name: str
+    dimensions: Dimensions = Dimensions()
+    cad = None
+    generate_cad_fn = None
+    generate_cam_fn = None
+
+    def __init__(
+            self,
+            name: str,
+            dimensions: Dimensions,
+            generate_cad_fn,
+            generate_cam_fn
+    ):
+        self.name = name
+        self.dimensions = dimensions
+        self.generate_cad_fn = generate_cad_fn
+        self.generate_cam_fn = generate_cam_fn
+
+        self.generate_cad()
+
+    def generate_cad(self, show=False):
+        self.cad = self.generate_cad_fn(self.dimensions)
+        if show:
+            show_object(self.cad, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
+
+    def generate_cam(self, job):
+        return self.generate_cam_fn(self, job)
+
+    def bounding_box(self):
+        if self.cad != None:
+            return self.cad.val().BoundingBox()
+        return None
+
+    def show(self):
+        show_object(self.cad, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
+
+
+class Layout:
+    parts = []
+    name: str
+    wp = None
+
+    def __init__(self, name, parts):
+        self.parts = parts
+        self.name = name
+        self.wp = cq.Workplane("XY")
+        for p in self.parts:
+            self.wp.add(p.cad)
+
+    def export_step(self, step_dir='.'):
+        cq.exporters.export(self.wp.vals(), f'{step_dir}/{self.name}.step')
+
+    def generate_cam_job(self, show=False):
+        combined_solids = self.wp.combineSolids()
+        top = self.parts[0].cad.faces(">Z").workplane()
+        job = Job(top, combined_solids)
+        for p in self.parts:
+            job = p.generate_cam(job)
+        # TODO export freecad or gcode.
+        if show:
+            show_object(job.show())
+
+    def show(self):
+        show_object(self.wp, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
+
+
+def pipe_back_cad(D):
     total_height = D.pipe_length + D.foot_cavity_height
     part = (
         # stock
@@ -52,11 +121,14 @@ def pipe_back(D, show=False):
         .rect(D.inner_width, D.dado_width)
         .cutBlind(-D.dado_depth)
     )
-    if show:
-        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
-def pipe_side(D, right_side=False, show=False):
+def pipe_back_cam(part, job):
+    tool = Endmill(diameter="1 mm")
+    profile_shape = part.cad.faces("<Z")
+    return job.profile(profile_shape, tool)
+
+def pipe_side_cad(D, right_side=False):
     total_height = D.pipe_length + D.foot_cavity_height
     part = (
         # stock
@@ -88,11 +160,14 @@ def pipe_side(D, right_side=False, show=False):
         .rect(D.dado_depth, total_height-D.upper_lip_height-D.foot_cavity_height)
         .cutBlind(-(D.pipe_part_thickness-D.dado_width))
     )
-    if show:
-        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
-def pipe_front(D, show=False):
+def pipe_side_cam(part, job):
+    tool = Endmill(diameter="1 mm")
+    profile_shape = part.cad.faces("<Z")
+    return job.profile(profile_shape, tool)
+
+def pipe_front_cad(D):
     total_height = D.pipe_length + D.foot_cavity_height
     part = (
         # stock
@@ -113,11 +188,12 @@ def pipe_front(D, show=False):
         .rect(D.dado_width, D.pipe_length-D.upper_lip_height)
         .cutBlind(-D.dado_depth)
     )
-    if show:
-        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
-def pipe_languid(D, show=False):
+def pipe_front_cam(part, job):
+    return job
+
+def pipe_languid_cad(D):
     part = (
         # stock
         cq.Workplane("XY")
@@ -129,11 +205,12 @@ def pipe_languid(D, show=False):
         .rect(D.inner_width, D.dado_width)
         .extrude(D.dado_depth)
     )
-    if show:
-        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
-def pipe_foot_base(D, show=False):
+def pipe_languid_cam(part, job):
+    return job
+
+def pipe_foot_base_cad(D):
     part = (
         # stock
         cq.Workplane("XY")
@@ -153,11 +230,12 @@ def pipe_foot_base(D, show=False):
         .circle(D.foot_hole_dia/2)
         .cutThruAll()
     )
-    if show:
-        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
-def pipe_upper_lip(D, show=False):
+def pipe_foot_base_cam(part, job):
+    return job
+
+def pipe_upper_lip_cad(D):
     part = (
         # stock
         cq.Workplane("XY")
@@ -222,12 +300,12 @@ def pipe_upper_lip(D, show=False):
     )
 
     part = part.cut(wedge_part)
-
-    if show:
-        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
-def pipe_face(D, show=False):
+def pipe_upper_lip_cam(part, job):
+    return job
+
+def pipe_face_cad(D):
     part = (
         # stock
         cq.Workplane("XY")
@@ -246,11 +324,12 @@ def pipe_face(D, show=False):
         .rect(D.inner_width, D.aperature+D.pipe_part_thickness)
         .cutBlind(-D.air_band_thickness)
     )
-    if show:
-        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
-def pipe_stopper(D, show=False):
+def pipe_face_cam(part, job):
+    return job
+
+def pipe_stopper_cad(D):
     part = (
         # stock
         cq.Workplane("XY")
@@ -265,25 +344,29 @@ def pipe_stopper(D, show=False):
         .circle(D.stopper_dowel_dia/2)
         .cutBlind(-D.pipe_part_thickness*0.75)
     )
-    if show:
-        show_object(part, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
     return part
 
-def layout_parts(
-        back,
-        right_side,
-        step_dir="."
-):
+def pipe_stopper_cam(part, job):
+    return job
 
-    back = back.translate((100, 100, 0))
-    right_side = right_side.translate((-100, 0, 0))
+def layout_parts(parts, step_dir="."):
 
-    # TODO translate all parts so they fit on a stock piece
-    wp = (cq.Workplane("XY")
-          .add(back)
-          .add(right_side)
-    )
-    cq.exporters.export(wp.vals(), f'{step_dir}/combined.step')
+    parts[0].cad = parts[0].cad.translate((100, 100, 0))
+    parts[1].cad = parts[1].cad.translate((-100, 0, 0))
+
+    # TODO generate layouts
+
+    layouts = [
+        Layout("layout_1", [parts[0], parts[1]])
+    ]
+    return layouts
+
+    # # TODO translate all parts so they fit on a stock piece
+    # wp = (cq.Workplane("XY")
+    #       .add(back)
+    #       .add(right_side)
+    # )
+    # cq.exporters.export(wp.vals(), f'{step_dir}/combined.step')
 
     # TODO Okay, i think this is the move:
     # layout parts, and hold onto references to the moved parts.
@@ -291,19 +374,19 @@ def layout_parts(
     # to define the CAM workpath for each moved part,
     # then add operations to the CAM job from the selected shape from
     # the shape
-    from ocp_freecad_cam import Endmill, Job
-    from ocp_freecad_cam.api import Stock
-    profile_shape1 = back.faces("<Z")
-    profile_shape2 = right_side.faces("<Z")
-    top = back.faces(">Z").workplane()
-    # stock = Stock(50, 50, 50, 50, 0, 50)
-    tool = Endmill(diameter="1 mm")
-    job = (
-        Job(top, wp.combineSolids())
-        .profile(profile_shape1, tool)
-        .profile(profile_shape2, tool)
-    )
-    show_object(job.show())
+    # from ocp_freecad_cam import Endmill, Job
+    # from ocp_freecad_cam.api import Stock
+    # profile_shape1 = back.faces("<Z")
+    # profile_shape2 = right_side.faces("<Z")
+    # top = back.faces(">Z").workplane()
+    # # stock = Stock(50, 50, 50, 50, 0, 50)
+    # tool = Endmill(diameter="1 mm")
+    # job = (
+    #     Job(top, wp.combineSolids())
+    #     .profile(profile_shape1, tool)
+    #     .profile(profile_shape2, tool)
+    # )
+    # show_object(job.show())
 
 
 def generate(
@@ -313,34 +396,38 @@ def generate(
         step_dir=".",
         exploded_by=10.0,
 ):
-    back = pipe_back(D)
-    right_side = pipe_side(D, right_side=True)
-    left_side = pipe_side(D, right_side=False)
-    front = pipe_front(D)
-    languid = pipe_languid(D)
-    foot_base = pipe_foot_base(D)
-    upper_lip = pipe_upper_lip(D)
-    face = pipe_face(D)
-    stopper = pipe_stopper(D)
+    back = Part("back", D, pipe_back_cad, pipe_back_cam)
+    right_side = Part("right_side", D, lambda d : pipe_side_cad(d, right_side=True), pipe_side_cam)
+    left_side = Part("left_side", D, lambda d : pipe_side_cad(d, right_side=False), pipe_side_cam)
+    front = Part("front", D, pipe_front_cad, pipe_front_cam)
+    languid = Part("languid", D, pipe_languid_cad, pipe_languid_cam)
+    foot_base = Part("foot_base", D, pipe_foot_base_cad, pipe_foot_base_cam)
+    upper_lip = Part("upper_lip", D, pipe_upper_lip_cad, pipe_upper_lip_cam)
+    face = Part("face", D, pipe_face_cad, pipe_face_cam)
+    stopper = Part("stopper", D, pipe_stopper_cad, pipe_stopper_cam)
 
-    layout_parts(
+    parts = [
         back,
         right_side,
-        step_dir=step_dir
-    )
-
-    if save:
-        back.export(f'{step_dir}/back.step')
+        left_side,
+        front,
+        languid,
+        foot_base,
+        upper_lip,
+        face,
+        stopper
+    ]
 
     if show_assembly:
         assembly = cq.Assembly()
-        assembly.add(back,
-                 name="back",
-                 color=cq.Color(0.92, 0.67, 0.97, 0.3)
+        assembly.add(
+            back.cad,
+            name=back.name,
+            color=cq.Color(0.92, 0.67, 0.97, 0.3)
         )
         assembly.add(
-            right_side,
-            name="right_side",
+            right_side.cad,
+            name=right_side.name,
             color=cq.Color(1.0, 0.94, 0.4, 0.3),
             loc=cq.Location(
                 D.inner_width/2,
@@ -350,8 +437,8 @@ def generate(
             )
         )
         assembly.add(
-            left_side,
-            name="left_side",
+            left_side.cad,
+            name=left_side.name,
             color=cq.Color(1.0, 0.94, 0.4, 0.3),
             loc=cq.Location(
                 -D.inner_width/2,
@@ -361,8 +448,8 @@ def generate(
             )
         )
         assembly.add(
-            front,
-            name="front",
+            front.cad,
+            name=front.name,
             color=cq.Color(0.44, 0.94, 0.4, 0.3),
             loc=cq.Location(
                 0,
@@ -372,8 +459,8 @@ def generate(
             )
         )
         assembly.add(
-            languid,
-            name="languid",
+            languid.cad,
+            name=languid.name,
             color=cq.Color(0.44, 0.94, 0.9, 0.3),
             loc=cq.Location(
                 0,
@@ -383,8 +470,8 @@ def generate(
             )
         )
         assembly.add(
-            foot_base,
-            name="foot_base",
+            foot_base.cad,
+            name=foot_base.name,
             color=cq.Color(0.74, 0.44, 0.1, 0.3),
             loc=cq.Location(
                 0,
@@ -394,8 +481,8 @@ def generate(
             )
         )
         assembly.add(
-            upper_lip,
-            name="upper_lip",
+            upper_lip.cad,
+            name=upper_lip.name,
             color=cq.Color(0.94, 0.94, 0.1, 0.3),
             loc=cq.Location(
                 0,
@@ -405,8 +492,8 @@ def generate(
             )
         )
         assembly.add(
-            face,
-            name="face",
+            face.cad,
+            name=face.name,
             color=cq.Color(0.04, 0.34, 0.7, 0.3),
             loc=cq.Location(
                 0,
@@ -416,8 +503,8 @@ def generate(
             )
         )
         assembly.add(
-            stopper,
-            name="stopper",
+            stopper.cad,
+            name=stopper.name,
             color=cq.Color(0.04, 0.34, 0.7, 0.3),
             loc=cq.Location(
                 0,
@@ -428,5 +515,15 @@ def generate(
         )
         show_object(assembly)
 
+    layouts = layout_parts(parts, step_dir=step_dir)
 
-generate(show_assembly=False, exploded_by=0)
+    for l in layouts:
+        l.show()
+        l.generate_cam_job(show=True)
+
+    # if save:
+    #     back.export(f'{step_dir}/back.step')
+
+
+
+generate(show_assembly=True, exploded_by=0)
