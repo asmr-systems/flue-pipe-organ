@@ -1,6 +1,7 @@
 import math
 import cadquery as cq
 from dataclasses import dataclass
+import rectpack
 from ocp_freecad_cam import Endmill, Job
 from ocp_freecad_cam.api import Stock
 
@@ -58,6 +59,12 @@ class Part:
             return self.cad.val().BoundingBox()
         return None
 
+    def width(self):
+        return self.bounding_box().xlen
+
+    def height(self):
+        return self.bounding_box().ylen
+
     def show(self):
         show_object(self.cad, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
 
@@ -67,9 +74,11 @@ class Layout:
     name: str
     wp = None
 
-    def __init__(self, name, parts):
+    def __init__(self, name, parts, width, height):
         self.parts = parts
         self.name = name
+        self.width = width
+        self.height = height
         self.wp = cq.Workplane("XY")
         for p in self.parts:
             self.wp.add(p.cad)
@@ -87,7 +96,14 @@ class Layout:
         if show:
             show_object(job.show())
 
-    def show(self):
+    def show(self, show_bounding_box=False):
+        if show_bounding_box:
+            box = (
+                cq.Workplane("XY")
+                .rect(self.width, self.height)
+            )
+            box = box.translate((self.width/2,self.height/2,0))
+            show_object(box)
         show_object(self.wp, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
 
 
@@ -349,16 +365,37 @@ def pipe_stopper_cad(D):
 def pipe_stopper_cam(part, job):
     return job
 
-def layout_parts(parts, step_dir="."):
+def layout_parts(parts, stock_width, stock_height, step_dir=".", margin_mm=6):
+    packer = rectpack.newPacker(
+        pack_algo=rectpack.SkylineMwf,
+        sort_algo=rectpack.SORT_SSIDE,
+        rotation=True
+    )
+    for idx, p in enumerate(parts):
+        packer.add_rect(
+            math.ceil(p.width()) + margin_mm*2,
+            math.ceil(p.height()) + margin_mm*2,
+            rid=idx
+        )
+    packer.add_bin(stock_width, stock_height, count=float("inf"))
+    packer.pack()
 
-    parts[0].cad = parts[0].cad.translate((100, 100, 0))
-    parts[1].cad = parts[1].cad.translate((-100, 0, 0))
+    layouts = []
+    for b in range(len(packer)):
+        arranged_parts = []
+        for i in range(len(packer[b])):
+            p = parts[packer[b][i].rid]
+            x = packer[b][i].x # bottom-left corner
+            y = packer[b][i].y # bottom-left corner
+            w = packer[b][i].width
+            h = packer[b][i].height
+            old_w = math.ceil(p.width()) + margin_mm*2
+            if old_w == h:
+                p.cad = p.cad.rotate((0, 0, 0), (0, 0, 1), 90)
+            p.cad = p.cad.translate((w/2 + x, h/2 + y, 0))
+            arranged_parts.append(p)
+        layouts.append(Layout(f'layout_{b}', arranged_parts, stock_width, stock_height))
 
-    # TODO generate layouts
-
-    layouts = [
-        Layout("layout_1", [parts[0], parts[1]])
-    ]
     return layouts
 
     # # TODO translate all parts so they fit on a stock piece
@@ -515,10 +552,15 @@ def generate(
         )
         show_object(assembly)
 
-    layouts = layout_parts(parts, step_dir=step_dir)
+    layouts = layout_parts(
+        parts,
+        D.stock_width,
+        D.stock_height,
+        step_dir=step_dir
+    )
 
     for l in layouts:
-        l.show()
+        l.show(show_bounding_box=True)
         l.generate_cam_job(show=True)
 
     # if save:
@@ -526,4 +568,4 @@ def generate(
 
 
 
-generate(show_assembly=True, exploded_by=0)
+generate(show_assembly=False, exploded_by=0)
