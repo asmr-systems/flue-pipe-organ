@@ -66,7 +66,7 @@ class Part:
         return self.bounding_box().ylen
 
     def show(self):
-        show_object(self.cad, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
+        show_object(self.cad, options={"alpha":0.5, "color": (0.3, 0.3, 0.3)})
 
 
 class Layout:
@@ -104,7 +104,7 @@ class Layout:
             )
             box = box.translate((self.width/2,self.height/2,0))
             show_object(box)
-        show_object(self.wp, options={"alpha":0.5, "color": (1.0, 1.0, 1.0)})
+        show_object(self.wp, options={"alpha":0.5, "color": (0.3, 0.3, 0.3)})
 
 
 def pipe_back_cad(D):
@@ -142,7 +142,21 @@ def pipe_back_cad(D):
 def pipe_back_cam(part, job):
     tool = Endmill(diameter="1 mm")
     profile_shape = part.cad.faces("<Z")
-    return job.profile(profile_shape, tool)
+    pocket_shape = part.cad.faces(">Z[1]")
+
+    # ---- STEP 1: Extract the outer wire ----
+    outer_wire = pocket_shape.val().outerWire()
+    # ---- STEP 2: Offset the wire in 2D ----
+    # offset2D(distance) → expands a planar wire
+    expanded_wire = outer_wire.offset2D(2.0)
+    # ---- STEP 3: Rebuild a face from the new wire ----
+    pocket_shape = cq.Face.makeFromWires(expanded_wire[0])
+    # TODO we need to be able to cut the existing shape or something....
+    return (
+        job
+        .profile(profile_shape, tool)
+        .pocket(pocket_shape, tool, pattern="zigzag_offset")
+    )
 
 def pipe_side_cad(D, right_side=False):
     total_height = D.pipe_length + D.foot_cavity_height
