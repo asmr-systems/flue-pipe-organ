@@ -139,10 +139,55 @@ def pipe_back_cad(D):
     )
     return part
 
+def get_extended_open_pocket_face(pocket_face, solid, extend_by=0):
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopAbs import TopAbs_FACE
+    from OCP.BRepTools import BRepTools
+    from OCP.TopExp import TopExp
+    from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
+    from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
+
+    # get all edges of pocket face
+    edges = pocket_face.edges()
+
+    open_edges = []
+    # get all adjacent faces of each edge
+    for edge in edges.vals():
+        mapping = TopTools_IndexedDataMapOfShapeListOfShape()
+        # print(dir(TopExp))
+        TopExp.MapShapesAndAncestors_s(
+            solid.val().wrapped,
+            TopAbs_EDGE,
+            TopAbs_FACE,
+            mapping
+        )
+        faces = []
+        if mapping.Contains(edge.wrapped):
+            faces = list(mapping.FindFromKey(edge.wrapped))
+
+        print(faces)
+
+        # A pocket bottom edge should have:
+        # - This bottom face
+        # - At least 1 wall face
+        # If only bottom face → edge is open
+        wall_faces = [
+            f for f in faces
+            if not f.IsSame(pocket_face.val().wrapped)
+        ]
+        print(wall_faces)
+        if len(wall_faces) == 0:
+            open_edges.append(e)
+
+    print(open_edges)
+    pass
+
 def pipe_back_cam(part, job):
     tool = Endmill(diameter="1 mm")
     profile_shape = part.cad.faces("<Z")
     pocket_shape = part.cad.faces(">Z[1]")
+
+    p = get_extended_open_pocket_face(pocket_shape, part.cad, extend_by=2)
 
     # ---- STEP 1: Extract the outer wire ----
     outer_wire = pocket_shape.val().outerWire()
@@ -573,13 +618,12 @@ def generate(
         step_dir=step_dir
     )
 
-    for l in layouts:
-        l.show(show_bounding_box=True)
-        l.generate_cam_job(show=True)
-
-    # if save:
-    #     back.export(f'{step_dir}/back.step')
-
+    for idx, l in enumerate(layouts):
+        # l.show(show_bounding_box=True)
+        # l.generate_cam_job(show=True)
+        if save:
+            cq.exporters.export(l.wp.vals(), f'{step_dir}/layout_{idx}.step')
 
 
-generate(show_assembly=False, exploded_by=0)
+
+# generate(save=True, show_assembly=False, exploded_by=0)
