@@ -2,8 +2,6 @@ import math
 import cadquery as cq
 from dataclasses import dataclass
 import rectpack
-from ocp_freecad_cam import Endmill, Job
-from ocp_freecad_cam.api import Stock
 
 @dataclass
 class Dimensions:
@@ -87,6 +85,9 @@ class Layout:
         cq.exporters.export(self.wp.vals(), f'{step_dir}/{self.name}.step')
 
     def generate_cam_job(self, show=False):
+        from ocp_freecad_cam import Endmill, Job
+        from ocp_freecad_cam.api import Stock
+
         combined_solids = self.wp.combineSolids()
         top = self.parts[0].cad.faces(">Z").workplane()
         job = Job(top, combined_solids)
@@ -486,6 +487,7 @@ def layout_parts(parts, stock_width, stock_height, step_dir=".", margin_mm=6):
 
 
 def generate(
+        pipe_id,
         D = Dimensions(),
         show_assembly=False,
         save=False,
@@ -622,7 +624,7 @@ def generate(
         # l.show(show_bounding_box=True)
         # l.generate_cam_job(show=True)
         if save:
-            cq.exporters.export(l.wp.vals(), f'{step_dir}/layout_{idx}.step')
+            cq.exporters.export(l.wp.vals(), f'{step_dir}/{pipe_id}_layout_{idx}.step')
 
 
 

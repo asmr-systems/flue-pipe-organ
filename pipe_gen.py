@@ -135,6 +135,7 @@ def generate(
     dimensions.stopper_felt_tolerance = stopper_felt_tolerance
 
     pipe_parts.generate(
+        f'pipe_{F}hz',
         dimensions,
         save=True,
         step_dir=output_dir
