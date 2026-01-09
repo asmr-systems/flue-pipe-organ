@@ -71,11 +71,12 @@ def compute_required_cfm(flue_air_band_thickness, flue_width, pressure):
 @click.option('-T','--stock-thickness', default=Dimensions.stock_thickness, help='thickness of stock material [mm]')
 @click.option('-W','--stock-width', default=Dimensions.stock_width, help='width of stock material [mm]')
 @click.option('-H','--stock-height', default=Dimensions.stock_height, help='height of stock material [mm]')
-@click.option('-P','--pipe-part-thickness', default=Dimensions.pipe_part_thickness, help='thickness of pipe parts (<= stock_thickness) [mm]')
+@click.option('-P','--pipe-part-thickness', help='thickness of pipe parts (<= stock_thickness) [mm]')
 @click.option('-F','--foot-hole-diameter', default=Dimensions.foot_hole_dia, help='foot hole diameter [mm]')
 @click.option('-D','--lip-grade', default=Dimensions.lip_grade_degrees, help='angle grade of lip slope [degrees]')
 @click.option('-O','--stopper-dowel-diameter', default=Dimensions.stopper_dowel_dia, help='diameter of stopper dowel [mm]')
 @click.option('-e','--stopper-felt-tolerance', default=Dimensions.stopper_felt_tolerance, help='tolerance of felt on stopper [mm]')
+@click.option('-A','--save-assembly', is_flag=True, help='save pipe assembly as a step file')
 def generate(
         output_dir,
         midi_note,
@@ -93,7 +94,8 @@ def generate(
         foot_hole_diameter,
         lip_grade,
         stopper_dowel_diameter,
-        stopper_felt_tolerance
+        stopper_felt_tolerance,
+        save_assembly
 ):
     """generates flue pipe dimensions according to provided specs."""
     # note: for default blow pressure, see https://en.wikipedia.org/wiki/Pipe_organ#:~:text=Pipe%20organ%20wind%20pressures%20are,two%20legs%20of%20the%20manometer.
@@ -120,7 +122,7 @@ def generate(
     dimensions.stock_thickness = stock_thickness
     dimensions.stock_width = stock_width
     dimensions.stock_height = stock_height
-    dimensions.pipe_part_thickness = pipe_part_thickness
+    dimensions.pipe_part_thickness = dimensions.stock_thickness if pipe_part_thickness is None else pipe_part_thickness
     dimensions.upper_lip_height = upper_lip_height
     dimensions.inner_width = W*1000
     dimensions.pipe_length = L*1000
@@ -134,11 +136,14 @@ def generate(
     dimensions.stopper_dowel_dia = stopper_dowel_diameter
     dimensions.stopper_felt_tolerance = stopper_felt_tolerance
 
+    print(dimensions.pipe_part_thickness)
+
     pipe_parts.generate(
         f'pipe_{F}hz',
         dimensions,
         save=True,
-        step_dir=output_dir
+        step_dir=output_dir,
+        save_assembly=save_assembly
     )
 
 if __name__ == '__main__':

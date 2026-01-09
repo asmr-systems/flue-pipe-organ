@@ -10,17 +10,17 @@ class Dimensions:
     stock_width: float = 1219.2
     stock_height: float = 609.6
     pipe_part_thickness: float = stock_thickness
-    upper_lip_height: float = 50
+    upper_lip_height: float = 100
     inner_width: float = 20
     pipe_length: float = 500
-    foot_cavity_height: float = 40
-    dado_width: float = 5
-    dado_depth: float = 4
-    foot_hole_dia: float = 10
+    foot_cavity_height: float = 80
+    dado_width: float = 6
+    dado_depth: float = 6
+    foot_hole_dia: float = 19 # 19 mm for 3/4" dowel, 28.5 mm diam of 1.1/8" dowel
     air_band_thickness: float = 1
     aperature: float = 4
-    lip_grade_degrees: float = 20
-    stopper_dowel_dia: float = 13
+    lip_grade_degrees: float = 30 # 30 for softer rounder tone, 45 for brighter
+    stopper_dowel_dia: float = 12.7 # for 1/2" dowel
     stopper_felt_tolerance: float = 1
 
 class Part:
@@ -425,7 +425,7 @@ def pipe_stopper_cad(D):
 def pipe_stopper_cam(part, job):
     return job
 
-def layout_parts(parts, stock_width, stock_height, step_dir=".", margin_mm=6):
+def layout_parts(parts, stock_width, stock_height, step_dir=".", margin_mm=15):
     packer = rectpack.newPacker(
         pack_algo=rectpack.SkylineMwf,
         sort_algo=rectpack.SORT_SSIDE,
@@ -489,10 +489,11 @@ def layout_parts(parts, stock_width, stock_height, step_dir=".", margin_mm=6):
 def generate(
         pipe_id,
         D = Dimensions(),
-        show_assembly=False,
         save=False,
         step_dir=".",
-        exploded_by=10.0,
+        save_assembly=False,
+        show_assembly=False,
+        exploded_by=0.0,
 ):
     back = Part("back", D, pipe_back_cad, pipe_back_cam)
     right_side = Part("right_side", D, lambda d : pipe_side_cad(d, right_side=True), pipe_side_cam)
@@ -511,12 +512,12 @@ def generate(
         front,
         languid,
         foot_base,
-        upper_lip,
+        #upper_lip,
         face,
         stopper
     ]
 
-    if show_assembly:
+    if save_assembly:
         assembly = cq.Assembly()
         assembly.add(
             back.cad,
@@ -611,7 +612,10 @@ def generate(
                 -90, 0, 0
             )
         )
-        show_object(assembly)
+
+        assembly.export(f'{step_dir}/{pipe_id}_assembly.step')
+        if show_assembly:
+            show_object(assembly)
 
     layouts = layout_parts(
         parts,
